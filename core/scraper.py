@@ -47,6 +47,24 @@ ENRICH_FIELDS = tuple(ENRICH_KEYS)
 
 
 # ── Chrome / driver ──────────────────────────────────────────────────────────
+def _find_chrome_binary() -> str:
+    """Return path to Chrome binary if installed in standard macOS / Linux locations, else ''."""
+    if sys.platform == "darwin":
+        for p in (
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            os.path.expanduser("~/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+        ):
+            if os.path.isfile(p):
+                return p
+    elif sys.platform.startswith("linux"):
+        import shutil
+        for name in ("google-chrome", "google-chrome-stable", "chromium-browser", "chromium"):
+            found = shutil.which(name)
+            if found:
+                return found
+    return ""
+
+
 def _chrome_major_version() -> int:
     version_re = re.compile(r"^(\d+)\.\d+\.\d+\.\d+$")
     if sys.platform.startswith("win"):
@@ -70,6 +88,34 @@ def _chrome_major_version() -> int:
                 return int(m.group(1))
         except Exception:
             pass
+    elif sys.platform == "darwin":
+        # Check Info.plist in /Applications/Google Chrome.app
+        for plist_path in (
+            "/Applications/Google Chrome.app/Contents/Info.plist",
+            os.path.expanduser("~/Applications/Google Chrome.app/Contents/Info.plist"),
+        ):
+            if os.path.isfile(plist_path):
+                try:
+                    import plistlib
+                    with open(plist_path, "rb") as fp:
+                        plist = plistlib.load(fp)
+                    ver = plist.get("CFBundleShortVersionString") or plist.get("CFBundleVersion") or ""
+                    m = re.match(r"(\d+)\.", str(ver))
+                    if m:
+                        return int(m.group(1))
+                except Exception:
+                    pass
+        # Fallback: invoke binary with --version
+        bin_path = _find_chrome_binary()
+        if bin_path:
+            try:
+                import subprocess
+                out = subprocess.check_output([bin_path, "--version"], text=True, timeout=2)
+                m = re.search(r"(\d+)\.", out)
+                if m:
+                    return int(m.group(1))
+            except Exception:
+                pass
     return 0
 
 
@@ -86,12 +132,34 @@ def get_driver(headless: bool = False):
     options.add_experimental_option("prefs", {"intl.accept_languages": "en-US,en"})
     options.page_load_strategy = "eager"
 
+    binary = _find_chrome_binary()
+    if binary:
+        options.binary_location = binary
+
     major = _chrome_major_version()
     kwargs = {"options": options, "use_subprocess": True}
     if major:
         kwargs["version_main"] = major
 
-    driver = uc.Chrome(**kwargs)
+    try:
+        driver = uc.Chrome(**kwargs)
+    except Exception as e:
+        err_str = str(e)
+        if sys.platform == "darwin":
+            if "Permission denied" in err_str or "chromedriver" in err_str.lower() or isinstance(e, OSError):
+                raise RuntimeError(
+                    "macOS Gatekeeper blocked undetected-chromedriver. "
+                    "Run this command in Terminal to unblock it:\n"
+                    "xattr -cr ~/Library/Application\\ Support/undetected_chromedriver"
+                ) from e
+            if not _find_chrome_binary():
+                raise RuntimeError(
+                    "Google Chrome was not found on your Mac. "
+                    "Please install Google Chrome from https://www.google.com/chrome "
+                    "and place it in /Applications."
+                ) from e
+        raise
+
     driver.set_window_size(1280, 900)
     driver.set_page_load_timeout(30)
     return driver

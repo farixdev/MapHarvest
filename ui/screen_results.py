@@ -569,6 +569,7 @@ class ResultsScreen(QWidget):
 
     def on_error(self, message: str):
         self.status_label.setText(f"Error: {message[:60]}")
+        self._show_toast(f"Error: {message}")
         self._set_idle_mode()
 
     def _on_export_clicked(self):
