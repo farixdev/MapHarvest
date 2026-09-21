@@ -167,18 +167,31 @@ def write_png(path: str, rgba: bytearray, size: int) -> None:
 
 
 def main() -> int:
+    ico = os.path.join(ROOT, "app_icon.ico")
+    png = os.path.join(ROOT, "app_icon.png")
+
+    # If a high-resolution custom PNG exists, generate ICO using Pillow
+    if os.path.isfile(png):
+        try:
+            from PIL import Image
+            img = Image.open(png)
+            ico_sizes = [(s, s) for s in SIZES]
+            img.save(ico, format="ICO", sizes=ico_sizes)
+            print(f"Generated {ico} from {png} ({os.path.getsize(ico):,} bytes)")
+            return 0
+        except Exception:
+            pass
+
     print("Rendering icon sizes:", ", ".join(str(s) for s in SIZES))
     images = []
     for s in SIZES:
         images.append((s, render(s)))
         print(f"  {s}x{s} done")
 
-    ico = os.path.join(ROOT, "app_icon.ico")
     write_ico(ico, images)
     print(f"Wrote {ico}  ({os.path.getsize(ico):,} bytes)")
 
     preview = dict(images)[256]
-    png = os.path.join(ROOT, "app_icon.png")
     write_png(png, preview, 256)
     print(f"Wrote {png}  ({os.path.getsize(png):,} bytes)")
     return 0

@@ -1,9 +1,10 @@
+import os
 import signal
 import sys
 import traceback
 
 from PyQt5.QtCore import QSize, QTimer
-from PyQt5.QtGui import QFont, QFontDatabase
+from PyQt5.QtGui import QFont, QFontDatabase, QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget
 
 from ui.screen_input import InputScreen
@@ -455,6 +456,9 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("MapHarvest")
+        icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app_icon.png")
+        if os.path.isfile(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         self.setFixedSize(QSize(820, 640))
 
         self.stack = QStackedWidget()
@@ -527,6 +531,9 @@ def run():
     app.setStyle("Fusion")
     load_font(app)
     app.setStyleSheet(QSS)
+    icon_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app_icon.png")
+    if os.path.isfile(icon_path):
+        app.setWindowIcon(QIcon(icon_path))
     _install_excepthook()
 
     window = MainWindow()
