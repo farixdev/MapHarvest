@@ -51,6 +51,7 @@ def normalize_spec(spec: dict | None) -> dict:
         "name_exclude": _terms(spec.get("name_exclude")),
         "category_include": _terms(spec.get("category_include")),
         "category_exclude": _terms(spec.get("category_exclude")),
+        "claim_status": str(spec.get("claim_status") or "any").strip().lower(),
     }
 
 
@@ -61,6 +62,7 @@ def is_active(spec: dict | None) -> bool:
         or s["require_phone"] or s["require_website"] or s["require_no_website"]
         or s["require_email"] or s["name_include"] or s["name_exclude"]
         or s["category_include"] or s["category_exclude"]
+        or s["claim_status"] in ("unclaimed", "claimed")
     )
 
 
@@ -75,6 +77,10 @@ def needs_phone(spec: dict | None) -> bool:
 
 def needs_email(spec: dict | None) -> bool:
     return normalize_spec(spec)["require_email"]
+
+
+def needs_claim(spec: dict | None) -> bool:
+    return normalize_spec(spec)["claim_status"] in ("unclaimed", "claimed")
 
 
 def cheap_pass(record: dict, spec: dict | None) -> bool:
@@ -115,6 +121,10 @@ def full_pass(record: dict, spec: dict | None) -> bool:
     if s["require_phone"] and not (record.get("phone") or "").strip():
         return False
     if s["require_email"] and not (record.get("email") or "").strip():
+        return False
+    if s["claim_status"] == "unclaimed" and record.get("claim_this_business") != "Yes":
+        return False
+    if s["claim_status"] == "claimed" and record.get("claim_this_business") != "No":
         return False
 
     reviews = _to_int(record.get("review_count"))

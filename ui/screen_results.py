@@ -17,10 +17,16 @@ class SortableItem(QTableWidgetItem):
     """Table cell that sorts numerically when both values look like numbers."""
 
     def __lt__(self, other):
-        a, b = self._num(self.text()), self._num(other.text())
+        t1 = (self.text() or "").strip()
+        t2 = (other.text() or "").strip()
+        if t1 == "—" and t2 != "—":
+            return False
+        if t2 == "—" and t1 != "—":
+            return True
+        a, b = self._num(t1), self._num(t2)
         if a is not None and b is not None:
             return a < b
-        return self.text().lower() < other.text().lower()
+        return t1.lower() < t2.lower()
 
     @staticmethod
     def _num(text):

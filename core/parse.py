@@ -116,6 +116,7 @@ def parse_card(card) -> dict:
         "latitude": "",
         "longitude": "",
         "place_id": "",
+        "claim_this_business": "",
         "_href": "",
         "_sponsored": False,
         "_key": "",

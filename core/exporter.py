@@ -7,6 +7,7 @@ FIELD_LABELS = {
     "rating": "Rating",
     "review_count": "Review Count",
     "hours": "Hours",
+    "claim_this_business": "Claim this business",
     "address": "Address",
     "website": "Website",
     "phone": "Phone",

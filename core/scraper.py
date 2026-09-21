@@ -39,7 +39,7 @@ T_DETAIL_LOAD = 0.5
 T_AFTER_SCROLL = 0.5
 
 # Fields that cannot be read from a feed card — they force a detail-page visit.
-DETAIL_ONLY_FIELDS = ("hours", "review_1", "review_2", "review_3")
+DETAIL_ONLY_FIELDS = ("hours", "review_1", "review_2", "review_3", "claim_this_business")
 # Card-derived fields that a detail visit can improve when one happens anyway.
 UPGRADEABLE_FIELDS = ("address", "category", "rating", "review_count")
 # Fields that require fetching the business website (HTTP, not the browser).
@@ -387,6 +387,50 @@ def _extract_hours(driver) -> str:
     return hours
 
 
+def _extract_claim_this_business(driver) -> str:
+    """Check if 'Claim this business' is present on the place detail page.
+
+    Returns 'Yes' if the business has the 'Claim this business' option (unclaimed),
+    or 'No' if it is claimed / does not have the option.
+    """
+    # 1. Quick check for common selectors and attributes
+    for sel in (
+        "[data-item-id='merchant']",
+        "a[href*='business.google.com/create']",
+        "a[href*='business.google.com']",
+        "button[aria-label*='Claim this business' i]",
+        "a[aria-label*='Claim this business' i]",
+    ):
+        try:
+            if driver.find_elements(By.CSS_SELECTOR, sel):
+                return "Yes"
+        except Exception:
+            continue
+
+    # 2. Check for div.Io6YTe containing 'Claim this business'
+    try:
+        for el in driver.find_elements(By.CSS_SELECTOR, "div.Io6YTe"):
+            txt = (el.text or el.get_attribute("textContent") or "").strip().lower()
+            if "claim this business" in txt:
+                return "Yes"
+    except Exception:
+        pass
+
+    # 3. Fallback: XPath check for text or aria-label containing 'claim this business'
+    try:
+        els = driver.find_elements(
+            By.XPATH,
+            "//*[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'claim this business') "
+            "or contains(translate(@aria-label, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'claim this business')]"
+        )
+        if els:
+            return "Yes"
+    except Exception:
+        pass
+
+    return "No"
+
+
 def _open_reviews_tab(driver) -> bool:
     for sel in ('button[aria-label*="Reviews"]', 'button[data-tab-index="1"]'):
         try:
@@ -486,6 +530,8 @@ def _extract_detail(driver, href: str, fields: list) -> dict:
                 out["review_count"] = count
         if "hours" in fields:
             out["hours"] = _extract_hours(driver)
+        if "claim_this_business" in fields:
+            out["claim_this_business"] = _extract_claim_this_business(driver)
         if any(f in fields for f in ("review_1", "review_2", "review_3")):
             reviews = _extract_reviews(driver, count=3)
             for i, key in enumerate(("review_1", "review_2", "review_3")):
@@ -535,6 +581,8 @@ def _detail_wants(card: dict, fields: list, spec: dict) -> list:
         want.append("review_count")
     if "rating" in fields and not card.get("rating"):
         want.append("rating")
+    if recfilters.needs_claim(spec) and "claim_this_business" not in want:
+        want.append("claim_this_business")
     # Opportunistically upgrade address/category if a visit is already happening.
     if want:
         for f in ("address", "category"):
@@ -591,7 +639,7 @@ def scrape_domain_progressive(
     # Filters that can only be decided after a detail visit / enrichment mean we
     # may reject some candidates, so over-collect to still reach the target.
     strict = (recfilters.needs_phone(spec) or recfilters.needs_email(spec)
-              or recfilters.needs_reviews(spec))
+              or recfilters.needs_reviews(spec) or recfilters.needs_claim(spec))
     collect_cap = target if not strict else min(target * 4, target + 300)
 
     seen = set()

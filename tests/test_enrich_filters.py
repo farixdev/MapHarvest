@@ -98,7 +98,7 @@ def test_filters():
     assert F.cheap_pass(rec(category="Roofing contractor"), {"category_include": ["roofing"]})
     assert not F.cheap_pass(rec(category="Cafe"), {"category_include": ["roofing"]})
 
-    # full: phone / email / reviews
+    # full: phone / email / reviews / claim_status
     assert F.full_pass(rec(phone="123", rating="5"), {"require_phone": True})
     assert not F.full_pass(rec(phone="", rating="5"), {"require_phone": True})
     assert F.full_pass(rec(email="a@b.com"), {"require_email": True})
@@ -106,14 +106,33 @@ def test_filters():
     assert F.full_pass(rec(review_count="120"), {"min_reviews": 100})
     assert not F.full_pass(rec(review_count="80"), {"min_reviews": 100})
     assert not F.full_pass(rec(review_count="500"), {"max_reviews": 100})
+    assert F.full_pass(rec(claim_this_business="Yes"), {"claim_status": "unclaimed"})
+    assert not F.full_pass(rec(claim_this_business="No"), {"claim_status": "unclaimed"})
+    assert F.full_pass(rec(claim_this_business="No"), {"claim_status": "claimed"})
+    assert not F.full_pass(rec(claim_this_business="Yes"), {"claim_status": "claimed"})
 
     # flags
     assert F.needs_reviews({"min_reviews": 10})
     assert F.needs_phone({"require_phone": True})
     assert F.needs_email({"require_email": True})
+    assert F.needs_claim({"claim_status": "unclaimed"})
+    assert F.needs_claim({"claim_status": "claimed"})
+    assert not F.needs_claim({"claim_status": "any"})
     assert not F.is_active({})
     assert F.is_active({"min_rating": 4})
+    assert F.is_active({"claim_status": "unclaimed"})
     print("filters: OK")
+
+
+def test_claim_html_detection():
+    # Test that the user's exact snippet is properly recognized
+    import lxml.html as LH
+    snippet = '<div class="Io6YTe fontBodyMedium kR99db fdkmkc ">Claim this business</div>'
+    doc = LH.fromstring(f"<div>{snippet}</div>")
+    matches = doc.xpath('//div[contains(@class, "Io6YTe") and contains(text(), "Claim this business")]')
+    assert len(matches) == 1
+    assert matches[0].text.strip() == "Claim this business"
+    print("claim html detection: OK")
 
 
 if __name__ == "__main__":
@@ -122,4 +141,5 @@ if __name__ == "__main__":
     test_social_with_query_string()
     test_www_prefix_and_domain_pref()
     test_filters()
+    test_claim_html_detection()
     print("\nALL ENRICH/FILTER TESTS PASSED")

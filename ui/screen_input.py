@@ -19,14 +19,14 @@ class InputScreen(QWidget):
     start_signal = pyqtSignal(list, list, list, bool, int, str, dict)
 
     FIELD_KEYS = [
-        "name", "category", "rating", "review_count", "hours",
+        "name", "category", "rating", "review_count", "hours", "claim_this_business",
         "address", "website", "phone", "maps_link",
         "latitude", "longitude", "place_id",
         "email", "facebook", "instagram", "linkedin", "twitter", "youtube",
         "review_1", "review_2", "review_3",
     ]
     FIELD_NAMES = [
-        "Business Name", "Category", "Rating", "Review Count", "Hours",
+        "Business Name", "Category", "Rating", "Review Count", "Hours", "Claim this business",
         "Address", "Website", "Phone Number", "Maps Link",
         "Latitude", "Longitude", "Place ID",
         "Email", "Facebook", "Instagram", "LinkedIn", "Twitter/X", "YouTube",
@@ -34,7 +34,7 @@ class InputScreen(QWidget):
     ]
 
     # Fields that require opening each listing's page (Maps detail).
-    DETAIL_FIELDS = {"hours", "review_1", "review_2", "review_3"}
+    DETAIL_FIELDS = {"hours", "claim_this_business", "review_1", "review_2", "review_3"}
     # Fields that require fetching each business website.
     ENRICH_FIELDS = {"email", "facebook", "instagram", "linkedin", "twitter", "youtube"}
     # Off by default because they're the slow paths.
@@ -249,7 +249,7 @@ class InputScreen(QWidget):
 
         right.addSpacing(6)
         fields_hint = QLabel(
-            "Hours/Reviews open each listing; Email & socials fetch each "
+            "Hours/Reviews/Claim open each listing; Email & socials fetch each "
             "website. Both are slower and off by default."
         )
         fields_hint.setObjectName("hint")
@@ -345,6 +345,12 @@ class InputScreen(QWidget):
         self.website_combo.addItems(["Any", "Has a website", "No website"])
         self.website_combo.setFixedWidth(160)
         grid2.addWidget(self.website_combo, 0, 1)
+
+        grid2.addWidget(QLabel("Claim status"), 1, 0)
+        self.claim_combo = QComboBox()
+        self.claim_combo.addItems(["Any", "Has 'Claim this business' (Unclaimed)", "No 'Claim this business' (Claimed)"])
+        self.claim_combo.setFixedWidth(260)
+        grid2.addWidget(self.claim_combo, 1, 1)
         grid2.setColumnStretch(2, 1)
         layout.addLayout(grid2)
         layout.addSpacing(10)
@@ -467,6 +473,7 @@ class InputScreen(QWidget):
         self.min_reviews_spin.setValue(0)
         self.max_reviews_spin.setValue(0)
         self.website_combo.setCurrentIndex(0)
+        self.claim_combo.setCurrentIndex(0)
         self.require_phone_cb.setChecked(False)
         self.require_email_cb.setChecked(False)
         for w in (self.name_include_input, self.name_exclude_input,
@@ -616,6 +623,12 @@ class InputScreen(QWidget):
         return [key for key, cb in self.checkboxes.items() if cb.isChecked()]
 
     def get_filters(self) -> dict:
+        claim_idx = self.claim_combo.currentIndex()
+        claim_status = "any"
+        if claim_idx == 1:
+            claim_status = "unclaimed"
+        elif claim_idx == 2:
+            claim_status = "claimed"
         return {
             "min_rating": self.min_rating_spin.value(),
             "min_reviews": self.min_reviews_spin.value(),
@@ -624,6 +637,7 @@ class InputScreen(QWidget):
             "require_website": self.website_combo.currentIndex() == 1,
             "require_no_website": self.website_combo.currentIndex() == 2,
             "require_email": self.require_email_cb.isChecked(),
+            "claim_status": claim_status,
             "name_include": self.name_include_input.text(),
             "name_exclude": self.name_exclude_input.text(),
             "category_include": self.cat_include_input.text(),
